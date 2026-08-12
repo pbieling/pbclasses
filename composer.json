@@ -1,0 +1,25 @@
+{
+    "name": "pbieling/pbclasses",
+	"version": "0.1.0"
+    "license": "MIT",
+    "description": "A framework for the rapid programming of PHP applications, and especially for the development of application platforms and intranet portals.",
+    "type": "library",
+    "require": {
+        "ext-pdo": "*",
+        "php": " >=8.1"
+    },
+    "require-dev": {
+        "ext-pdo_mysql": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "PbClasses\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Peter Bieling",
+            "email": "pb@p-bieling.de"
+        }
+    ]
+}
