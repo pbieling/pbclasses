@@ -351,8 +351,21 @@ class User
                 exit;
             }
         }
+        
+        $this->redirectToBaseUrl();
 
-        return true;
+    }
+    
+    /**
+     * The reload prevents the page from being called again as a POST request after 
+     * login, which would otherwise trigger browser prompts.
+     */
+    private function redirectToBaseUrl() {
+        
+        $subdir = Conf::get('sub_dir') ?? '';
+        header('Location: /' . $subdir, true, 303);
+        exit;
+        
     }
 
     /**

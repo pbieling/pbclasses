@@ -10,6 +10,8 @@ use PbClasses\Trees\NaviTree;
 use PbClasses\Tpl\CreateMakeNavi;
 use PbClasses\Tpl\SubNavi;
 use PbClasses\Tpl\BreadcrumbNavi;
+use PbClasses\Tpl\LanguageTemplates;
+use PbClasses\Tpl\Form\MakeSelect;
 use Exception;
 
 /**
@@ -33,9 +35,11 @@ class ShowPage
     private string $pageType;
     private string $templatePath;
     private array $searchReplace = ['pbconfdata' => ''];
+    private ?array $i18nConf = null;
 
     public function __construct()
     {
+        
         $this->initialize();
         $this->setupTemplateEngine();
         $this->renderPage();
@@ -46,6 +50,7 @@ class ShowPage
      */
     private function initialize(): void
     {
+        $this->i18nConf = Conf::get( 'I18n');
         $this->templatePath = Conf::get('BACKTPLPATH');
         $this->pageType = $this->detectPageType();
         $this->pageConfig = Conf::get('page_conf') ?? [];
@@ -115,8 +120,7 @@ class ShowPage
     private function setupTemplateEngine(): void
     {
         $this->resolveTemplateConfiguration();
-        
-        $outerTemplate = $this->templatePath . $this->pageConfig['outer_tpl_file'];
+        $outerTemplate = LanguageTemplates::get($this->i18nConf, $this->templatePath, $this->pageConfig['outer_tpl_file']);
         $this->templateEngine = new PbTpl($outerTemplate);
         
         Conf::set('t', $this->templateEngine);
@@ -223,7 +227,8 @@ class ShowPage
      */
     private function createContentTemplate(): void
     {
-        $templateFile = $this->templatePath . $this->pageConfig[$this->pageType]['tpl_file'];
+        //$templateFile = $this->templatePath . $this->pageConfig[$this->pageType]['tpl_file'];
+        $templateFile = LanguageTemplates::get($this->i18nConf, $this->templatePath, $this->pageConfig[$this->pageType]['tpl_file']);
         $contentTemplate = new PbTpl($templateFile);
         
         Conf::set('c', $contentTemplate);
@@ -398,10 +403,27 @@ class ShowPage
             $this->searchReplace['toolbar'] = '';
             return;
         }
-        
+        $languageSelection = $this->renderLanguageSelection();
         $loginBlock = $this->renderLoginBlock();
-        $this->searchReplace['toolbar'] = $this->templateEngine->fillTpl('toolbar', 'login', $loginBlock);
+        $searchReplace = ['language_selection' => $languageSelection,
+                          'login' => $loginBlock];
+        $this->searchReplace['toolbar'] = $this->templateEngine->fillTpl('toolbar',$searchReplace);
     }
+    
+    private function renderLanguageSelection() {
+        $supportedLanguageArray = Conf::get(['I18n', 'language_selection']);
+        if ($supportedLanguageArray === null) {
+            return '';
+        }
+        
+        $selectedLang = $_SESSION['selected_lang'] ?? Conf::get('pref_lang');
+        $options = MakeSelect::get($this->templateEngine, $supportedLanguageArray, $selectedLang);
+        return $this->templateEngine->fillTpl('language_selection', 'options', $options);
+        
+        
+    }
+    
+    
 
     /**
      * Render login block for toolbar

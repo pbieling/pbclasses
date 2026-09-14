@@ -55,22 +55,31 @@ namespace PbClasses\Trees;
 
 use PbClasses\Conf;
 use \PbClasses\Access;
- 
-class NaviTree {
 
-   
+class NaviTree
+{
+
+    const DEFAULT_PROJECT_LANG = 'en';
+    const DEFAULT_LANGUAGE_TABLE = 'pbc__navigation_translation';
+
+
+
     protected $db;
     protected $table;
+    protected $translationArray = null;
 
-    public function __construct($table, $dbHandle = false) {
+    public function __construct($table, $dbHandle = false)
+    {
         $this->db = ($dbHandle) ? $dbHandle : \PbClasses\Conf::get('db');
         $this->table = $table;
+        $this->setTranslationArray();
     }
 
-    public function getNaviRows($pageIndex = 0) {
+    public function getNaviRows($pageIndex = 0)
+    {
         if (!Conf::get('site_navi_tree')) {
             if (!$this->setNaviTree()) {
-                return array();
+                return [];
             }
         }
         return Conf::get('site_navi_tree')[$pageIndex]['nextlevel'];
@@ -81,38 +90,26 @@ class NaviTree {
      * 
      * @return boolean
      */
-    protected function setNaviTree() {
-        $what = " *, 0 as level, '' as parents, '' as nextlevel";
-        $where = "Hide = 0";
-        $condition = 'ORDER BY ParentID, Ord';
-
-        if (isset(Conf::get('backnavi_row')['AccLevel'])) {
-            if (!isset($_SESSION['frg'])) {
-                $frg = -1;
-            } else {
-                $frg = $_SESSION['frg'];
-            }
-            $where .= " AND '$frg' >= AccLevel";
-        }
-        // \PbClasses\Develop::test($where, __LINE__, 1);
-
-        $accObj = (Conf::get('access_tables')) ? new Access() : null;
-        
-        
-        $res = $this->db->selectAssoc($this->table, $what, $where, '', $condition);
-        // \PbClasses\Develop::test($res, __LINE__, 1);
+    protected function setNaviTree()
+    {
+        $res = $this->getTreeData();
 
         if (!$res) {
             return false;
         }
+        $accObj = (Conf::get('access_tables')) ? new Access() : null;
 
         $items = array();
         foreach ($res as $row) {
-           // new \PbClasses\Debug\Logging($row, __FILE__, __LINE__);
+            // new \PbClasses\Debug\Logging($row, __FILE__, __LINE__);
             $row['ID'] = (int) $row['ID'];
-            if ($accObj && !$accObj->hasAccess($_SESSION['uid'],  $row['ID'])) {
+            if ($accObj && !$accObj->hasAccess($_SESSION['uid'], $row['ID'])) {
                 continue;
             }
+            if ($this->translationArray && isset($this->translationArray[$row['ID']])) {
+                $row['Label'] = $this->translationArray[$row['ID']];
+            }
+            
             $row['ParentID'] = (int) $row['ParentID'];
             //Es ist nützlich, z.B. für die Darstellung, wenn jedes Element die Verschachtelungstiefe
             //kennt sowie seine Eltern-Elemente (parents)
@@ -133,9 +130,71 @@ class NaviTree {
         }
         $refItems = & $items; //Todo: Performance testen
         Conf::set('site_navi_tree', $refItems);
-        
-      
+
         return true;
     }
 
+    private function getTreeData()
+    {
+        $what = "ID, ParentID, Label, URL, AltTpl, HelpID, Ord, Hide, NoPage, AccLevel, 0 as level, '' as parents, '' as nextlevel";
+        $where = "Hide = 0";
+        $condition = 'ORDER BY ParentID, Ord';
+
+        if (isset(Conf::get('backnavi_row')['AccLevel'])) {
+            if (!isset($_SESSION['frg'])) {
+                $frg = -1;
+            } else {
+                $frg = $_SESSION['frg'];
+            }
+            $where .= " AND '$frg' >= AccLevel";
+        }
+        // \PbClasses\Develop::test($where, __LINE__, 1);
+
+
+
+        return $this->db->selectAssoc($this->table, $what, $where, '', $condition);
+        // \PbClasses\Develop::test($res, __LINE__, 1);
+    }
+
+    protected function setTranslationArray()
+    {
+        /*
+         *                 'I18n' => [
+          'project_lang' => 'de',
+          'supported_lang' => ['de', 'en'],
+          'default_notsupported_lang' => 'en', //If the user language is not supported the fallback is English [en]
+          'navigation_translation_table' => 'navigation_translation'
+
+          ],
+         */
+        $langConf = Conf::get('I18n');
+        if (!$langConf) {
+            return;
+        }
+        
+        
+        $projectLang = $langConf['project_lang'] ?? self::DEFAULT_PROJECT_LANG;
+        $prefLang =  $_SESSION['selected_lang'] ?? Conf::get('pref_lang') ?? $projectLang;
+        //The user's language is already the language of the navigation table. 
+        if ($projectLang === $prefLang) {
+            return;
+        }
+        $defaultNotSupportedLang = $langConf['default_notsupported_lang'] ?? self::DEFAULT_PROJECT_LANG;
+
+        $language = in_array($prefLang, $langConf['supported_lang']) ? $prefLang : $defaultNotSupportedLang;
+        $langTable = $langConf['navigation_translation_table'] ?? self::DEFAULT_LANGUAGE_TABLE;
+        $what = ['NavigationId', 'Entry'];
+        $where = ['Language' => $language];
+        $condition = 'ORDER BY NavigationId';
+        $res = $this->db->selectAssoc($langTable, $what, $where, '', $condition);
+
+        if (!$res) {
+            return;
+        }
+
+        $this->translationArray = [];
+        foreach ($res as $row) {
+            $this->translationArray[$row['NavigationId']] = $row['Entry'];
+        }
+    }
 }

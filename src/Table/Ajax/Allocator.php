@@ -33,6 +33,7 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
 
     public function action(): void
     {
+        $this->handleSessionStart();
         $this->G = Conf::get('get_param');
 
         $this->validateRequiredParams();
@@ -42,7 +43,7 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
         $tabFile = $this->buildTableFilePath($tabPath, $tabid);
 
         $this->loadConfiguration($tabFile);
-        $this->handleSessionStart();
+        //$this->handleSessionStart(); //This is too late, because the session might be needed in the configuration.
         $this->configureTableSettings();
         $this->configurePagination();
 
@@ -309,11 +310,7 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
 
     private function setLanguageMappings(): void
     {
-        $langIndex = $this->P['pbtpl_language'] ?? 'de';
-
-        if (!empty($this->conf['js_language_mapping'][$langIndex])) {
-            $this->rslt['js_language_mapping'] = $this->conf['js_language_mapping'][$langIndex];
-        }
+        $this->rslt['js_language_mapping'] = $this->conf['js_language_mapping'] ?? [];
     }
 
     private function setModalInputModifiers(): void
@@ -632,26 +629,35 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
     private function handleUnknownCommand(string $cmd): void
     {
         $this->errorOutput(
-                'Unbekannter Befehl',
+                'Unknown command',
                 __FILE__,
                 __LINE__,
                 "Command: $cmd"
         );
     }
 
-    // Keep remaining protected methods from original class
-    // (checkUpdateRights, validation, handleUpdateFilters, etc.)
-
     protected function handleSessionStart(): void
     {
-        $isPublic = ($this->conf['access'] ?? null) === 'public';
 
-        if ($isPublic) {
-            session_start();
-        } else {
-            \PbClasses\Ajax\SessionStart::start();
-        }
+        \PbClasses\Ajax\SessionStart::start();
     }
+
+    /*
+      // Keep remaining protected methods from original class
+      // (checkUpdateRights, validation, handleUpdateFilters, etc.)
+
+      protected function handleSessionStart(): void
+      {
+      $isPublic = ($this->conf['access'] ?? null) === 'public';
+
+      if ($isPublic) {
+      session_start();
+      } else {
+      \PbClasses\Ajax\SessionStart::start();
+      }
+      }
+     * 
+     */
 
     protected function modifyUpdArr(array &$updArr): void
     {
@@ -877,7 +883,6 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
      * @param mixed $filterArr  array or empty strimng from Post variable.
      * @return void
      */
-    
     protected function buildFilterCondition(mixed $filterArr): void
     {
         $sessionKey = $this->conf['unique_identifier'];

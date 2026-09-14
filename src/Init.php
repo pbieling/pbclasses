@@ -71,6 +71,7 @@ class Init
             $this->loadProjectConfiguration();
 
             $srcpage = $this->getSrcPage();
+
             $this->pageConfig = $this->loadPageConfiguration($srcpage, $pageConfigParam);
 
             $this->processGetParameters();
@@ -126,7 +127,7 @@ class Init
             'db_credentials' => [],
             'db_tables' => [],
             'sess_config' => [],
-            'pref_lang' => substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2) ?? 'en',
+            'pref_lang' => $_SESSION['selected_lang'] ?? substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2) ?? 'en',
         ]);
     }
 
@@ -159,8 +160,17 @@ class Init
      */
     private function getSrcPage(): string
     {
-        $srcpage = filter_input(INPUT_GET, 'srcpage', FILTER_SANITIZE_SPECIAL_CHARS) ?? '';
 
+        if (getenv('MY_PHP_ROUTER') === '1') {
+            $srcpage = $_GET['srcpage'] ?? '';
+        } else {
+            $srcpage = filter_input(INPUT_GET, 'srcpage', FILTER_SANITIZE_SPECIAL_CHARS) ?? '';
+        }
+
+        if ($srcpage && preg_match('~login$~', $srcpage)) {
+            return 'index.php';
+        }       
+        
         if ($srcpage && preg_match('~admin/logout\.php$~', $srcpage)) {
             Conf::set('do_logout', true);
             return 'index.php';
@@ -173,6 +183,7 @@ class Init
 
         return $srcpage;
     }
+
 
     /**
      * Loads the configuration for the requested page
@@ -503,7 +514,6 @@ class Init
         $_SESSION['base_pid'] = $this->pageConfig['PAGE_ID'];
         $_SESSION['base_srcpage'] = $srcpage;
 
-
         if (Conf::get('public_mode') === true && Conf::get('access_tables') === null) {
             $_SESSION['login'] = true;
             $_SESSION['frg'] = 0;
@@ -680,7 +690,7 @@ class Init
             exit;
         }
 
-        echo Messages::get('An error occured');
+        echo Messages::get('An error occurred');
         exit;
     }
 }
