@@ -31,6 +31,7 @@ class Session
             $this->configureSession();
             $this->startSession();
             $this->validateSessionId();
+            $this->setSelectedLanguage();
         } catch (\Exception $e) {
             // Log error appropriately in production
             error_log("Session initialization failed: " . $e->getMessage());
@@ -324,5 +325,12 @@ class Session
     public function getConfig(): array
     {
         return $this->sessConfig;
+    }
+    
+    private function setSelectedLanguage() {
+
+        if (isset($_SESSION['selected_lang'])) {
+            Conf::set('pref_lang', $_SESSION['selected_lang']);
+        } 
     }
 }

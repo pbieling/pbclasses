@@ -45,7 +45,7 @@
  * @author Peter Bieling and
  * http://www.phpbar.de/w/Baumstruktur_aus_DB_in_Array_abbilden
  * 
- * Anmerkung (p.b) Der gesamte Baum ist in der Darstellung sehr gruoß es werden aber nur die Referenzen
+ * Anmerkung (p.b) Der gesamte Baum ist in der Darstellung sehr groß es werden aber nur die Referenzen
  * gespeichert.
  * Vorteile:    Nur eine DB-Abfrage
  *              Leichter Zugriff auf die Teilbäume ohne den Baum durchsuchen zu müssen
@@ -101,7 +101,6 @@ class NaviTree
 
         $items = array();
         foreach ($res as $row) {
-            // new \PbClasses\Debug\Logging($row, __FILE__, __LINE__);
             $row['ID'] = (int) $row['ID'];
             if ($accObj && !$accObj->hasAccess($_SESSION['uid'], $row['ID'])) {
                 continue;
@@ -148,12 +147,7 @@ class NaviTree
             }
             $where .= " AND '$frg' >= AccLevel";
         }
-        // \PbClasses\Develop::test($where, __LINE__, 1);
-
-
-
         return $this->db->selectAssoc($this->table, $what, $where, '', $condition);
-        // \PbClasses\Develop::test($res, __LINE__, 1);
     }
 
     protected function setTranslationArray()
@@ -174,7 +168,7 @@ class NaviTree
         
         
         $projectLang = $langConf['project_lang'] ?? self::DEFAULT_PROJECT_LANG;
-        $prefLang =  $_SESSION['selected_lang'] ?? Conf::get('pref_lang') ?? $projectLang;
+        $prefLang =  Conf::get('pref_lang') ?? $projectLang;
         //The user's language is already the language of the navigation table. 
         if ($projectLang === $prefLang) {
             return;

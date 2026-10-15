@@ -9,6 +9,7 @@ use PbClasses\User;
 use PbClasses\View\ShowPage;
 use PbClasses\Exception\Logging;
 use PbClasses\Exception\Messages;
+use PbClasses\Util\SystemLanguage; //
 
 /**
  * Init class for framework initialization
@@ -25,6 +26,12 @@ use PbClasses\Exception\Messages;
 class Init
 {
 
+    /**
+     * Fallback language for I18n support
+     * @var string
+     */
+    private const DEFAULT_LANGUAGE = 'en';
+    
     /**
      * Path to the admin directory
      * @var string
@@ -73,10 +80,11 @@ class Init
             $srcpage = $this->getSrcPage();
 
             $this->pageConfig = $this->loadPageConfiguration($srcpage, $pageConfigParam);
-
+            $this->setPreferredLanguage();
             $this->processGetParameters();
             $this->initializeDatabase();
             $this->handleSessionAndAuth($srcpage);
+
             $this->executePageLogic();
         } catch (\Exception $exc) {
             $this->handleFatalError($exc);
@@ -127,7 +135,8 @@ class Init
             'db_credentials' => [],
             'db_tables' => [],
             'sess_config' => [],
-            'pref_lang' => $_SESSION['selected_lang'] ?? substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2) ?? 'en',
+           // 'pref_lang' => 'en', // later
+                // @see setPreferredLanguage()
         ]);
     }
 
@@ -169,8 +178,8 @@ class Init
 
         if ($srcpage && preg_match('~login$~', $srcpage)) {
             return 'index.php';
-        }       
-        
+        }
+
         if ($srcpage && preg_match('~admin/logout\.php$~', $srcpage)) {
             Conf::set('do_logout', true);
             return 'index.php';
@@ -183,7 +192,6 @@ class Init
 
         return $srcpage;
     }
-
 
     /**
      * Loads the configuration for the requested page
@@ -454,6 +462,36 @@ class Init
     }
 
     /**
+     * 
+     */
+    private function setPreferredLanguage(): void
+    {
+        
+        /*
+        if (isset($_SESSION['selected_lang'])) {
+            $language = $_SESSION['selected_lang'];
+        } 
+         * 
+         */
+        
+        
+        
+        // already set in project.conf.php
+        if (Conf::get('pref_lang')) {
+              return;
+        } 
+        
+        if (!empty($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
+            $language = substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2);
+        } elseif (PHP_SAPI === 'cli')  {
+            $language = SystemLanguage::get();
+        } else {
+            $language = self::DEFAULT_LANGUAGE;
+        }
+        Conf::set('pref_lang', $language);
+    }
+
+    /**
      * Loads the BackNavi data for the current page
      *
      * Retrieves additional information from the backnavi table
@@ -565,6 +603,13 @@ class Init
         } elseif (isset($this->pageConfig['ajaxclass'])) {
             $this->executeAjaxClass($this->pageConfig['ajaxclass']);
         }
+
+        /*
+        *  ELSE :
+         * The initialization ends here.
+         * The subsequent program flow is no longer handled by PbClasses but by 
+         * the application itself that uses PbClasses.
+         */
     }
 
     /**

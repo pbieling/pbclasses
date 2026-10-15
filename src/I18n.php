@@ -1,13 +1,35 @@
 <?php
+
 namespace PbClasses;
+
 use PbClasses\Conf;
+
+/**
+ * Provides I18n support if defined in the admin/project.conf.php.
+ * E.g. 
+ 	'I18n' => [
+		'project_lang' => 'de',
+		//if no language file is given for the project language, use the second parameter and not
+		//the default langauage file:
+		'default_value_if_project_lang' => true,
+		'supported_lang' => ['de', 'en', 'el'],
+		'language_selection' => [
+			'de' => 'DE',
+			'en' => 'EN',
+			'el' => 'GR'
+		],
+		'fallback_language' => 'en', //If the user language is not supported the fallback is English [en]
+		'navigation_translation_table' => 'pbc__navigation_translation'
+	],
+ */
+
 
 class I18n
 {
+
     const FALLBACK_LANGUAGE = 'en';
 
     private static ?I18n $instance = null;
-
     private array $translations = [];
     private array $registeredFiles = [];
     private string $fallbackLanguage;
@@ -21,14 +43,6 @@ class I18n
         if ($files) {
             $this->register($files);
         }
-        /*
-         *                 'I18n' => [
-          'project_lang' => 'de',
-          'supported_lang' => ['de', 'en'],
-          'fallback_language' => 'en', //If the user language is not supported the fallback is English [en]
-          'navigation_translation_table' => 'pbc__navigation_translation'
-          ],
-         */
         $this->fallbackLanguage = Conf::get(['I18n', 'fallback_language']) ?? self::FALLBACK_LANGUAGE;
     }
 
@@ -37,6 +51,7 @@ class I18n
      */
     private function __clone(): void
     {
+        
     }
 
     /**
@@ -69,7 +84,6 @@ class I18n
             $path = ($fileName === basename($fileName)) ? Conf::get('APATH') . 'system/languages/' : '';
             $this->registeredFiles[$key] = $path . $fileName;
         }
-        //new \PbClasses\Debug\Logging($this->registeredFiles, __FILE__, __LINE__);
     }
 
     public function get(string $key, ?string $default = null): mixed
@@ -84,7 +98,7 @@ class I18n
         }
 
         //Possible typo i.e. 'table' instead of 'tables' 
-        if (! isset($this->translations[$fileKey])) {
+        if (!isset($this->translations[$fileKey])) {
             return $default ?? $key;
         }
         $value = $this->translations[$fileKey];
@@ -99,29 +113,24 @@ class I18n
             return $value; //For some JavaScript appllications the whole array ist needed. I.e. labels for buttons
             //are needed in several languages
         }
-        
-        
+
+
         return is_string($value) ? $value : ($default ?? $key);
     }
 
     private function load($fileKey): void
     {
 
-        /*
-         *                 'I18n' => [
-                            'project_lang' => 'de',
-                            //if no language file is given for the project language, use the second parameter and not
-                            //the default langauage file.
-                            'default_value_if_project_lang' => true,
-                            'supported_lang' => ['de', 'en'],
-                            'fallback_language' => 'en', //If the user language is not supported the fallback is English [en]
-                            'navigation_translation_table' => 'pbc__navigation_translation'
+        $lang = Conf::get('pref_lang') ?? $this->fallbackLanguage;
+        //@see \PbClasses\Session : $_SESSION['selected_lang'] is set to 'pref_lang' in configuration, so we don't need to check again here.
 
-                        ],
-         *    
+        /*
+         * The parameter 
+         * 'default_value_if_project_lang' = true
+         * specifies that the default value passed when calling the 
+         * method should be used if the current language matches the project language.
          */
-        $lang =  $_SESSION['selected_lang'] ?? Conf::get('pref_lang');
-        if ($lang === Conf::get(['I18n', 'project_lang' ]) && Conf::get(['I18n', 'default_value_if_project_lang']) === true) {
+        if ($lang === Conf::get(['I18n', 'project_lang']) && Conf::get(['I18n', 'default_value_if_project_lang']) === true) {
             $this->translations[$fileKey] = [];
             return;
         }
@@ -144,9 +153,10 @@ class I18n
         }
         $this->load($fileKey);
     }
-    
-    public function map($confKey, $seReArr) {
-        
+
+    public function map($confKey, $seReArr)
+    {
+
         $translated = [];
         foreach ($seReArr as $searchKey => $default) {
             $translated[$searchKey] = $this->get($confKey . '.' . $searchKey, $default);

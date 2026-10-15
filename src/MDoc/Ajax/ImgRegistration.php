@@ -5,12 +5,6 @@ namespace PbClasses\MDoc\Ajax;
 use PbClasses\Conf;
 use PbModule_commondocu\MConf;
 
-/**
- * Description of ImgRegistration
- *
- * @author Peter Bieling - info@media-palette.de
- * Created on : 24.05.2018, 17:27:25
- */
 class ImgRegistration extends \PbClasses\Ajax\AbstractResponse {
 
     protected $conf;
@@ -54,10 +48,6 @@ class ImgRegistration extends \PbClasses\Ajax\AbstractResponse {
 
         $crDate = $this->imgArr['imgdata_crdate'];
 
-        new \PbClasses\Debug\Logging($this->imgArr['imgdata_crdate']);
-        //  $this->rslt['errortext'] = 'test';
-        // $this->output();
-
         $inArr = array('ImgFile' => $this->imgArr['imgdata_imgname'],
             'ImgPath' => '/', //Todo
             'ImgW' => $imgArr[0],
@@ -70,7 +60,6 @@ class ImgRegistration extends \PbClasses\Ajax\AbstractResponse {
             'Comment' => $this->imgArr['imgdata_comment'],
             'UploadFileName' => $this->imgArr['imgdata_oldimage']
         );
-        new \PbClasses\Debug\Logging($inArr);
 
         $table = $this->conf['doc_tables']['PAGE_IMAGES_INDEX'];
         try {

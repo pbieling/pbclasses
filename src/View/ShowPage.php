@@ -15,11 +15,11 @@ use PbClasses\Tpl\Form\MakeSelect;
 use Exception;
 
 /**
- * Main page rendering class for the PB Framework
+ * Main page rendering class for PbClasses
  * 
  * Handles page type detection, template management, navigation, and content display
  * 
- * @author Peter Bieling - 2026-01-16
+ * @author Peter Bieling
  */
 class ShowPage
 {
@@ -415,12 +415,9 @@ class ShowPage
         if ($supportedLanguageArray === null) {
             return '';
         }
-        
-        $selectedLang = $_SESSION['selected_lang'] ?? Conf::get('pref_lang');
+        $selectedLang = Conf::get('pref_lang');
         $options = MakeSelect::get($this->templateEngine, $supportedLanguageArray, $selectedLang);
         return $this->templateEngine->fillTpl('language_selection', 'options', $options);
-        
-        
     }
     
     

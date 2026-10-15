@@ -13,12 +13,6 @@ class UpdateEntry extends \PbClasses\Ajax\AbstractResponse {
 
     public function action() {
         \PbClasses\Ajax\SessionStart::start();
-            /*
-            new \PbClasses\Debug\Logging($this->P, __FILE__, __LINE__);
-            $this->rslt['errortext'] = 'Test - Abbruch.';
-            $this->output(__FILE__, __LINE__);
-             * 
-             */
         
         $this->db = Conf::get('db');
 
@@ -46,10 +40,10 @@ class UpdateEntry extends \PbClasses\Ajax\AbstractResponse {
         $upd = $what;
         
         try {
-            //Werte ergänzen:
+            //Add values:
             $what['ModID'] = $this->P['modid'];
             $what['PageId'] = $this->P['id'];
-            //Der Filter wird in der Konfiguration festgelegt
+            //The filter is defined in the confkguration.
             $what['Filter'] = $this->conf['doc_vars']['placeholder_filter'][$placeHolder]; //$this->P['filter'];
             $what['Placeholder'] = $placeHolder;
             //ON DUPLICATE KEY UPDATE
@@ -58,9 +52,8 @@ class UpdateEntry extends \PbClasses\Ajax\AbstractResponse {
             }
             return false;
         } catch (\Exception $exc) {
-            new \PbClasses\Exception\Logging($exc->getMessage(), __FILE__, __LINE__) ;
-            $err = 'Datenbankproblem.';
-            $this->errorOutput($err, __FILE__, __LINE__);
+            $err = 'Database problem.';
+            $this->errorOutput($err, __FILE__, __LINE__, $exc->getMessage());
         }
     }
 

@@ -35,18 +35,17 @@ class LanguageTemplates
         }
 
         $projectLang = $i18nConf['project_lang'] ?? self::FALLBACK_LANGUAGE;
-        $prefLang =  $_SESSION['selected_lang'] ?? Conf::get('pref_lang') ?? $i18nConf['fallback_language'] ?? self::FALLBACK_LANGUAGE;
+        $prefLang = Conf::get('pref_lang') ?? $i18nConf['fallback_language'] ?? self::FALLBACK_LANGUAGE;
         if ($projectLang === $prefLang) {
             return $defaultTpl;
         }
 
         if (!isset($i18nConf['supported_lang']) || !in_array($prefLang, $i18nConf['supported_lang'])) {
-            $fallbackLang = $i18nConf['fallback_language'] ?? self::FALLBACK_LANGUAGE;
-            if ($fallbackLang === $projectLang) {
-                return $defaultTpl;
-            }
+            $prefLang = $i18nConf['fallback_language'] ?? self::FALLBACK_LANGUAGE;
         }
-
+        if ($prefLang === $projectLang) {
+            return $defaultTpl;
+        }
 
         $prefTpl = $tplDir . $prefLang . '/' . $fileName;
         if (file_exists($prefTpl)) {

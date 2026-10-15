@@ -10,7 +10,9 @@ use PbClasses\Table\UpdateRow;
 use PbClasses\Table\DeleteRow;
 use PbClasses\Table\BaseFilters;
 use PbClasses\Table\Event;
+use PbClasses\PbTpl;
 use PbClasses\Exception\Logging as ExcLogging;
+use PbClasses\Exception\Messages;
 
 /**
  * Allocator handles AJAX requests for table operations (CRUD)
@@ -33,20 +35,14 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
 
     public function action(): void
     {
-        $this->handleSessionStart();
         $this->G = Conf::get('get_param');
-
         $this->validateRequiredParams();
-
         $tabid = $this->P['tabid'];
         $tabPath = $this->resolveTablePath($tabid);
         $tabFile = $this->buildTableFilePath($tabPath, $tabid);
-
+        $this->handleSessionStart();
         $this->loadConfiguration($tabFile);
-        //$this->handleSessionStart(); //This is too late, because the session might be needed in the configuration.
         $this->configureTableSettings();
-        $this->configurePagination();
-
         $this->allocate($this->P['cmd']);
     }
 
@@ -57,7 +53,7 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
     {
         if (empty($this->P['cmd']) || empty($this->P['tabid'])) {
             $this->errorOutput(
-                    'Technischer Fehler 1',
+                    Messages::get('Technical error'),
                     __FILE__,
                     __LINE__,
                     'Parameter cmd oder tabid fehlt'
@@ -165,10 +161,10 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
     {
         if (!file_exists($tabFile)) {
             $this->errorOutput(
-                    'Technischer Fehler - Tabellenkonfiguration fehlt.',
+                    Messages::get('Technical error'),
                     __FILE__,
                     __LINE__,
-                    $tabFile
+                    $tabFile . ' is missing'
             );
         }
 
@@ -239,7 +235,7 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
         }
     }
 
-    //Cloade optimized:
+    //Claude.ai optimized:
     private function handleAllCmd(): void
     {
         $this->initializeSession();
@@ -293,14 +289,6 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
 
     private function getFieldLabels(): array
     {
-        $langIndex = $this->P['pbtpl_language'] ?? 'de';
-        $langKey = 'display_name_' . $langIndex;
-
-        // Try language-specific labels first, then fallback to default
-        if (isset($this->conf['table_def'][$langKey]) && is_array($this->conf['table_def'][$langKey])) {
-            return $this->conf['table_def'][$langKey];
-        }
-
         if (isset($this->conf['table_def']['display_name']) && is_array($this->conf['table_def']['display_name'])) {
             return $this->conf['table_def']['display_name'];
         }
@@ -416,10 +404,10 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
         $this->addModuleConfigData();
         if (!$this->checkUpdateRights($this->P['fieldname'])) {
             $this->errorOutput(
-                    'Update nicht erlaubt.',
+                    Messages::get('Technical error'),
                     __FILE__,
                     __LINE__,
-                    $this->P['fieldname']
+                    'Update not allowed: ' . $this->P['fieldname']
             );
         }
 
@@ -439,7 +427,7 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
     }
 
     /**
-     * Handle single field update
+     * Processes the update of a row.
      */
     private function handleRowUpdate(string $primaryKey): void
     {
@@ -447,14 +435,14 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
         $updArr = json_decode($this->P['field_arr'], true);
 
         if (!count($updArr)) {
-            $err = 'Keine Daten für Update erhalten.';
-            $this->errorOutput($err, __FILE__, __LINE__, $updArr);
+            $err = Message::get('Technical error');
+            $this->errorOutput($err, __FILE__, __LINE__, 'No data received for the update.');
         }
         foreach ($updArr as $k => $v) {
 
             if (!$this->checkUpdateRights($k)) {
-                $err = 'Update nicht erlaubt.';
-                $this->errorOutput($err, __FILE__, __LINE__, 'Wert: ' . $k);
+                $err = Message::get('Operation not permitted'); //'Update nicht erlaubt.';
+                $this->errorOutput($err, __FILE__, __LINE__, 'Update not allowed. Value: ' . $k);
             }
             $this->applyPHPFilters($k, $v, 'update'); //Call by reference
             $this->validation($k, $v, 'update');
@@ -503,13 +491,13 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
     protected function getSwitchVal($fieldname, $currVal)
     {
         if (!isset($this->conf['table_def']['rights']['switch'][$fieldname])) {
-            $err = 'Vorgang nicht erlaubt.';
+            $err = Message::get('Operation not permitted');
             $this->errorOutput($err, __FILE__, __LINE__, $fieldname . ' => ' . \print_r($currVal, true));
         }
         $switchArr = $this->conf['table_def']['rights']['switch'][$fieldname];
         if (!isset($switchArr[$currVal])) {
-            $err = 'Switch - fehlerhafter Index.';
-            $this->errorOutput($err, __FILE__, __LINE__, $currVal);
+            $err = Message::get('Technical error');
+            $this->errorOutput($err, __FILE__, __LINE__, 'The index is missing. ' . $currVal);
         }
 
         reset($switchArr);
@@ -537,8 +525,8 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
         }
         foreach ($inArr as $k => $v) {
             if (!$this->checkInsertRights($k)) {
-                $err = 'Einfügen nicht erlaubt.';
-                $this->errorOutput($err, __FILE__, __LINE__, 'Key ' . $k . '  Value: ' . $v);
+                $err = Message::get('Operation not permitted');
+                $this->errorOutput($err, __FILE__, __LINE__, 'Insert not allowed. Key ' . $k . '  Value: ' . $v);
             }
             $this->applyPHPFilters($k, $v, 'insert'); //Call by reference
             //Validierung
@@ -553,8 +541,8 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
 
         $succ = $tableObj->insert($inArr);
         if (!$succ) {
-            $err = 'Einfügen nicht möglich.';
-            $this->errorOutput($err, __FILE__, __LINE__, $inArr);
+            new ExcLogging('Insert not possible.', __FILE__, __LINE__);
+            $this->errorOutput(Message::get('Operation not possible'), __FILE__, __LINE__, $inArr);
         }
         $this->rslt['succ'] = 'OK';
 
@@ -567,21 +555,21 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
     {
         $this->addModuleConfigData();
         if (!isset($this->P['delete_id'])) {
-            $err = 'Technischer Fehler';
-            $this->errorOutput($err, __FILE__, __LINE__, 'Delete-ID: ' . $this->P['delete_id']);
+            $err = Message::get('Technical error');
+            $this->errorOutput($err, __FILE__, __LINE__, 'Delete-ID is missing. ' . print_r($this->P, true));
         }
 
         if (empty($this->conf['table_def']['rights']['delete'])) {
-            $err = 'Löschen nicht erlaubt.';
-            $this->errorOutput($err, __FILE__, __LINE__, 'Delete-ID: ' . $this->P['delete_id']);
+            $err = Message::get('Operation not permitted');
+            $this->errorOutput($err, __FILE__, __LINE__, 'Deletion not allowed. Delete-ID: ' . $this->P['delete_id']);
         }
         //3rd param checks if logging is active. In this case the deleted row will be saved.
         $tableObj = new DeleteRow($this->conf['ins_upd_table'], $primaryKey, $this->mustLogDeletion());
 
         $succ = $tableObj->delete($this->P['delete_id']);
         if (!$succ) {
-            $err = 'Löschen nicht möglich.';
-            $this->errorOutput($err, __FILE__, __LINE__, 'Delete-ID: ' . $this->P['delete_id']);
+            $err = Message::get('Operation not possible');
+            $this->errorOutput($err, __FILE__, __LINE__, 'Deletion not possible. Delete-ID: ' . $this->P['delete_id']);
         }
         $this->optionalChangeLog($tableObj);
     }
@@ -601,7 +589,7 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
         if (!$tableObj->update($id, $updArr)) {
             new ExcLogging($this->P, __FILE__, __LINE__);
             $this->errorOutput(
-                    'Update nicht möglich.',
+                    Message::get('Operation not possible'),
                     __FILE__,
                     __LINE__,
                     $updArr
@@ -629,10 +617,10 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
     private function handleUnknownCommand(string $cmd): void
     {
         $this->errorOutput(
-                'Unknown command',
+                Message::get('Technical error'),
                 __FILE__,
                 __LINE__,
-                "Command: $cmd"
+                "Unknown ommand: $cmd"
         );
     }
 
@@ -641,23 +629,6 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
 
         \PbClasses\Ajax\SessionStart::start();
     }
-
-    /*
-      // Keep remaining protected methods from original class
-      // (checkUpdateRights, validation, handleUpdateFilters, etc.)
-
-      protected function handleSessionStart(): void
-      {
-      $isPublic = ($this->conf['access'] ?? null) === 'public';
-
-      if ($isPublic) {
-      session_start();
-      } else {
-      \PbClasses\Ajax\SessionStart::start();
-      }
-      }
-     * 
-     */
 
     protected function modifyUpdArr(array &$updArr): void
     {
@@ -758,10 +729,10 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
                 new $classname($presetArr, $this->conf);
             } catch (\Exception $exc) {
                 $this->errorOutput(
-                        'Fehler in Preset-Klasse',
+                        Message::get('Technical error'),
                         __FILE__,
                         __LINE__,
-                        $classname . ' ' . $exc->getMessage()
+                       'Error in preset class ' . $classname . ' ' . $exc->getMessage()
                 );
             }
         }
@@ -773,8 +744,9 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
     {
         $this->addModuleConfigData();
         if (!isset($this->P['method_name'])) {
+            new ExcLogging('Method name not defined.', __FILE__, __LINE__);
             $this->errorOutput(
-                    'Konfigurationsfehler: Methodenname ist nicht definiert.',
+                    Message::get('Configuration error'),
                     __FILE__,
                     __LINE__,
                     $this->P
@@ -785,19 +757,19 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
 
         if (!isset($this->conf['dojob'][$methodName])) {
             $this->errorOutput(
-                    'Die Funktion ist nicht definiert.',
+                    Message::get('Configuration error'),
                     __FILE__,
                     __LINE__,
-                    $methodName
+                    $methodName . ' not defined.'
             );
         }
 
         if (!isset($this->conf['dojob'][$methodName]['classname'])) {
             $this->errorOutput(
-                    'Konfigurationsfehler: Der Klassenname ist nicht definiert.',
+                    Message::get('Configuration error'),
                     __FILE__,
                     __LINE__,
-                    $this->conf['dojob'][$methodName]
+                    $this->conf['dojob'][$methodName] . ' . Classname not defined.'
             );
         }
 
@@ -811,10 +783,10 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
             $this->rslt['dojob'] = $obj->doJob();
         } catch (\Exception $exc) {
             $this->errorOutput(
-                    'Technischer Fehler bei der Ausführung der Funktion.',
+                     Message::get('Technical error'),
                     __FILE__,
                     __LINE__,
-                    $exc->getMessage()
+                    'Method error : '. $exc->getMessage()
             );
         }
     }
@@ -879,8 +851,9 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
     }
 
     /**
+     * Constructs the WHERE clause for the filter conditions from the configuration.
      * 
-     * @param mixed $filterArr  array or empty strimng from Post variable.
+     * @param mixed $filterArr  array or empty string from Post variable.
      * @return void
      */
     protected function buildFilterCondition(mixed $filterArr): void
@@ -905,16 +878,16 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
             if ($filterConf === null) {
                 //exits with error message
                 $this->errorOutput(
-                        'Technischer Fehler - Filter.',
+                        Message::get('Technical error'),
                         __FILE__,
                         __LINE__,
-                        $filtername . ' => ' . print_r($sgKVArr, true)
+                        'Technical error - filter ' . $filtername . ' => ' . print_r($sgKVArr, true)
                 );
             }
 
             if (isset($filterConf['filter_where'])) {
                 $escaped = array_map([$db, 'escape'], $sgKVArr);
-                $tpl = new \PbClasses\PbTpl($filterConf['filter_where'], false, 'query');
+                $tpl = new PbTpl($filterConf['filter_where'], false, 'query');
                 $tmpFilterArr[] = '(' . $tpl->fillTpl('query', $escaped) . ')';
             } elseif (isset($filterConf['classname'])) {
                 try {
@@ -922,10 +895,10 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
                     $tmpFilterArr[] = '(' . $obj->get() . ')';
                 } catch (\Exception $exc) {
                     $this->errorOutput(
-                            'Technischer Fehler - Filter.',
+                            Message::get('Technical error'),
                             __FILE__,
                             __LINE__,
-                            $exc->getMessage()
+                            'Technical error - filter '. $exc->getMessage()
                     );
                 }
             }
@@ -958,13 +931,21 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
         }
 
         $_SESSION[$this->conf['unique_identifier']]['sortorder'] = $sortString .= join(', ', $tmpOrderArr);
-        //Daten auch strukturiert speichern:
+        //Also store data in a structured format:
         $_SESSION[$this->conf['unique_identifier']]['sortorder_arr'] = $sortArr;
     }
 
-    protected function mailNotification($type)
+    
+    /**
+     * If email notification is configured, send only 
+     * one email per session and type.
+     * 
+     * @param string $type
+     * @return void
+     */
+    protected function mailNotification($type): void
     {
-        //Nur eine Mail pro Sitzung verschicken!
+        
         if (!empty($_SESSION['MailNotification'][$type])) {
             return;
         }
@@ -1027,16 +1008,16 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
     {
         if ($val === '{WHERE_ID}') {
             if (!isset($_SESSION[$this->conf['unique_identifier']]['where_id'])) {
-                $err = 'Konfigurationsfehler';
-                $this->errorOutput($err, __FILE__, __LINE__, 'where_id fehlt');
+                $err = Message::get('Configuration error');
+                $this->errorOutput($err, __FILE__, __LINE__, 'where_id is missing.');
             }
             return $_SESSION[$this->conf['unique_identifier']]['where_id'];
         }
 
         if ($val === '{SCOPE}') {
             if (!isset($_SESSION[$this->conf['unique_identifier']]['scope'])) {
-                $err = 'Konfigurationsfehler';
-                $this->errorOutput($err, __FILE__, __LINE__, 'scope fehlt');
+                $err = Message::get('Configuration error');
+                $this->errorOutput($err, __FILE__, __LINE__, 'Scope is missing.');
             }
             return $_SESSION[$this->conf['unique_identifier']]['scope'];
         }
@@ -1052,14 +1033,14 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
         foreach ($this->conf['auto_insert'] as $key => $val) {
             if ($val === '{WHERE_ID}') {
                 if (!isset($_SESSION[$this->conf['unique_identifier']]['where_id'])) {
-                    $err = 'Konfigurationsfehler';
-                    $this->errorOutput($err, __FILE__, __LINE__, 'where_id fehlt');
+                    $err = Message::get('Configuration error');
+                    $this->errorOutput($err, __FILE__, __LINE__, 'where_id is missing.');
                 }
                 $inArr[$key] = $_SESSION[$this->conf['unique_identifier']]['where_id'];
             } elseif ($val === '{SCOPE}') {
                 if (!isset($_SESSION[$this->conf['unique_identifier']]['scope'])) {
-                    $err = 'Konfigurationsfehler';
-                    $this->errorOutput($err, __FILE__, __LINE__, 'scope fehlt');
+                    $err = Message::get('Configuration error');
+                    $this->errorOutput($err, __FILE__, __LINE__, 'scope is missing. ');
                 }
                 $inArr[$key] = $_SESSION[$this->conf['unique_identifier']]['scope'];
             } else {
@@ -1081,7 +1062,7 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
         $obj = new \PbClasses\DB\TableStructure();
         $structure = $obj->get($table);
 
-        //Alle Infos werden gebraucht:
+        //All table information is required.
         if (isset($this->conf['table_def']['rights']['insert'])) {
             //Bei der Eingabe kann es dennoch theoretisch möglich sein, dass nur besteimmte Felder erlaubt sind!
             if (true === $this->conf['table_def']['rights']['insert']) {
@@ -1104,8 +1085,8 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
 
         foreach ($neededFieldsArr as $fieldname) {
             if (!isset($structure[$fieldname])) {
-                $err = $fieldname . ': Konfigurationsfehler, bitte wenden Sie sich an den Administrator.';
-                $this->errorOutput($err, __FILE__, __LINE__, 'fieldname: ' . $fieldname);
+                 $err = Message::get('Configuration error');
+                 $this->errorOutput($err, __FILE__, __LINE__, 'fieldname is missing: ' . $fieldname);
             }
             $structArr[$fieldname] = $structure[$fieldname];
         }
@@ -1118,15 +1099,13 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
             $this->rslt['own_forms'] = null;
             return;
         }
-        //$tplFile in Abhängigkeit von der Sprache
-        $tplFile = \PbClasses\Tpl\Ajax\HelperLanguage::languageTpl($this->conf['table_js_ownforms']);
-
+        $tplFile = $this->conf['table_js_ownforms'];
         if (!file_exists($tplFile)) {
-            $err = 'Konfigurationsfehler, bitte wenden Sie sich an den Administrator.';
-            $this->errorOutput($err, __FILE__, __LINE__, 'JS-Template');
+            $err = Message::get('Configuration error');
+            $this->errorOutput($err, __FILE__, __LINE__, 'JS template file is missing.');
         }
 
-        $t = new \PbClasses\PbTpl($tplFile);
+        $t = new PbTpl($tplFile);
         $this->rslt['own_forms'] = $t->getTplArr();
     }
 
@@ -1134,7 +1113,7 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
     {
         // return ' testclass';
         if (empty($this->conf['table_def']['rowmarker_class'])) {
-            return '';
+            return ''; 
         }
         try {
             $cl = $this->conf['table_def']['rowmarker_class'];
@@ -1181,8 +1160,8 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
 
 
         if (!is_array($fieldnames) || !count($fieldnames)) {
-            $err = 'Technischer Fehler 5';
-            $this->errorOutput($err, __FILE__, __LINE__, print_r($fieldnames, true));
+            $err = Message::get('Technical error');
+            $this->errorOutput($err, __FILE__, __LINE__, 'fieldnames no array or empty: ' . print_r($fieldnames, true));
         }
 
         foreach ($fieldnames as $sgFieldname) {
@@ -1224,8 +1203,8 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
 
 
         if (!is_array($fieldnames) || !count($fieldnames)) {
-            $err = 'Technischer Fehler 5';
-            $this->errorOutput($err, __FILE__, __LINE__, print_r($fieldnames, true));
+            $err = Message::get('Technical error');
+            $this->errorOutput($err, __FILE__, __LINE__, 'fieldnames - no array or empty ' . print_r($fieldnames, true));
         }
 
         foreach ($fieldnames as $sgFieldname) {
@@ -1293,7 +1272,7 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
     protected function validationError($fieldName, $err = null)
     {
         if (null === $err) {
-            $err = 'Ungültige Eingabe';
+            $err = Message::get('Invalid input');
         }
         $this->rslt['validation_error'] = $err;
         $this->rslt['validation_fieldname'] = $fieldName;
@@ -1320,11 +1299,12 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
 
     protected function applyBaseFilter($method, $v)
     {
-        if (method_exists("BaseFilters", $method)) {
+        if (method_exists(BaseFilters::class, $method)) {
             return BaseFilters::$method($v);
         }
 
-        new ExcLogging('Method ' . $method . ' not defined!');
-        return $v;
+        $techErr = 'Method ' . $method . ' not defined!';
+        $err = Message::get('Technical error');
+        $this->errorOutput($err, __FILE__, __LINE__, $techErr);
     }
 }
