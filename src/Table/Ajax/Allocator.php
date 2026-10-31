@@ -83,7 +83,7 @@ class Allocator extends \PbClasses\Ajax\AbstractResponse
         array_shift($parts); // Remove 'module'
         $moduleName = $this->normalizeModuleName(array_shift($parts));
 
-        $modulePath = Conf::get('module_path') ?? dirname(Conf::get('APATH')) . '/modules/';
+        $modulePath = Conf::get('MODULE_PATH') ?? dirname(Conf::get('APATH')) . '/modules/';
 
         $this->initializeModule($modulePath, $moduleName);
 

@@ -58,7 +58,7 @@ abstract class AbstractResponse {
      * @return void
      */
     protected function loadModuleConfig(string $modNsp, string $modName): void {
-        $modulePath = Conf::get('module_path');
+        $modulePath = Conf::get('MODULE_PATH');
         $configFile = $modulePath . $modName . '/module.conf.php';
 
         if (!file_exists($configFile)) {
